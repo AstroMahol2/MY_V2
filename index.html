@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Routine</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --black: #0A0A0A;
+    --surface: #141414;
+    --card: #1C1C1C;
+    --border: #2A2A2A;
+    --white: #F5F5F5;
+    --muted: #666;
+    --orange: #FF5C00;
+    --orange-dim: rgba(255,92,0,0.12);
+    --r: 9px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    background: var(--black);
+    color: var(--white);
+    font-family: 'Inter', -apple-system, sans-serif;
+    min-height: 100dvh;
+    overscroll-behavior: none;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--black);
+    border-bottom: 1px solid var(--border);
+    padding: env(safe-area-inset-top,0) 20px 0;
+  }
+  .header-inner {
+    display: flex; align-items: center; justify-content: space-between;
+    height: 56px;
+  }
+  .logo { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
+  .logo span { color: var(--orange); }
+
+  .header-actions { display: flex; gap: 8px; align-items: center; }
+
+  .icon-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.15s, opacity 0.15s, background 0.15s;
+  }
+  .icon-btn:active { transform: scale(0.88); }
+  .icon-btn-ghost { background: var(--card); }
+  .icon-btn-ghost svg { stroke: var(--muted); }
+  .icon-btn-ghost.active { background: var(--orange-dim); }
+  .icon-btn-ghost.active svg { stroke: var(--orange); }
+  .icon-btn-orange { background: var(--orange); }
+  .icon-btn-orange svg { stroke: #fff; }
+  .icon-btn svg { width: 18px; height: 18px; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ── LIST ── */
+  .list {
+    padding: 16px 16px calc(env(safe-area-inset-bottom,0px) + 24px);
+    display: flex; flex-direction: column; gap: 12px;
+  }
+
+  /* ── CARD ── */
+  .card {
+    background: var(--card);
+    border-radius: var(--r);
+    overflow: hidden;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1), border-color 0.2s, box-shadow 0.2s;
+    -webkit-user-select: none;
+    position: relative;
+  }
+  .card:not(.reorder-mode):active { transform: scale(0.975); }
+  .card:not(.reorder-mode):hover { border-color: var(--orange); }
+
+  /* drag state */
+  .card.dragging {
+    opacity: 0.4;
+    transform: scale(0.97);
+    border-color: var(--orange);
+  }
+  .card.drag-over {
+    border-color: var(--orange);
+    box-shadow: 0 0 0 2px var(--orange);
+  }
+
+  /* reorder mode handle */
+  .drag-handle {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 44px;
+    display: none;
+    align-items: center; justify-content: center;
+    cursor: grab;
+    z-index: 10;
+  }
+  .drag-handle:active { cursor: grabbing; }
+  .drag-handle svg { width: 18px; height: 18px; stroke: var(--muted); }
+  .reorder-active .drag-handle { display: flex; }
+  .reorder-active .card { cursor: default; }
+  .reorder-active .card-inner { margin-left: 44px; pointer-events: none; }
+
+  .card-inner { transition: margin-left 0.2s; }
+
+  /* thumb */
+  .card-thumb {
+    position: relative; width: 100%;
+    aspect-ratio: 16/9; overflow: hidden;
+    background: var(--surface);
+  }
+  .card-thumb img {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+    transition: transform 0.3s ease;
+  }
+  .card:not(.reorder-active):hover .card-thumb img { transform: scale(1.03); }
+
+  .play-overlay {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.3);
+    transition: background 0.2s;
+  }
+  .reorder-active .play-overlay { display: none; }
+
+  .play-icon {
+    width: 48px; height: 48px; border-radius: 50%;
+    background: var(--orange);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 20px rgba(255,92,0,0.5);
+    transition: transform 0.18s, box-shadow 0.18s;
+  }
+  .card:hover .play-icon { transform: scale(1.1); box-shadow: 0 6px 28px rgba(255,92,0,0.7); }
+  .play-icon svg { width: 20px; height: 20px; fill: #fff; margin-left: 3px; }
+
+  .card-thumb::after {
+    content: ''; position: absolute; bottom: 0; left: 0;
+    height: 2px; width: 0; background: var(--orange);
+    transition: width 0.35s ease;
+  }
+  .card:not(.reorder-active):hover .card-thumb::after { width: 100%; }
+
+  /* body */
+  .card-body { padding: 12px 14px 14px; }
+  .card-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    color: var(--orange); text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .card-title {
+    font-size: 15px; font-weight: 600; line-height: 1.4;
+    color: var(--white); margin-bottom: 6px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .card-meta { display: flex; align-items: center; gap: 8px; }
+  .card-channel {
+    font-size: 11px; color: var(--muted); font-weight: 500;
+    letter-spacing: 0.2px; flex: 1;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .card-remove {
+    width: 28px; height: 28px; border-radius: 6px;
+    background: transparent; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.2s, background 0.15s;
+  }
+  .card:hover .card-remove { opacity: 1; }
+  .card-remove:hover { background: rgba(255,92,0,0.15); }
+  .card-remove svg { width: 14px; height: 14px; stroke: var(--muted); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .card-remove:hover svg { stroke: var(--orange); }
+  .reorder-active .card-remove { display: none; }
+
+  /* reorder banner */
+  .reorder-banner {
+    display: none;
+    background: var(--orange-dim);
+    border-bottom: 1px solid rgba(255,92,0,0.2);
+    padding: 10px 20px;
+    font-size: 12px; font-weight: 600;
+    color: var(--orange); letter-spacing: 0.3px;
+    text-align: center;
+  }
+  .reorder-active ~ * .reorder-banner,
+  body.reorder-active .reorder-banner { display: block; }
+
+  /* ── EMPTY STATE ── */
+  .empty {
+    display: none; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 12px; padding: 80px 32px; text-align: center;
+  }
+  .empty.show { display: flex; }
+  .empty-icon {
+    width: 64px; height: 64px; border-radius: 16px;
+    background: var(--orange-dim);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 4px;
+  }
+  .empty-icon svg { width: 28px; height: 28px; stroke: var(--orange); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .empty h2 { font-size: 18px; font-weight: 600; }
+  .empty p { font-size: 13px; color: var(--muted); line-height: 1.6; max-width: 240px; }
+
+  /* ── MODAL ── */
+  .modal-backdrop {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: blur(6px);
+    display: flex; align-items: flex-end;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  .modal-backdrop.open { opacity: 1; pointer-events: all; }
+  .modal-sheet {
+    width: 100%; background: var(--surface);
+    border-radius: 16px 16px 0 0;
+    border-top: 1px solid var(--border);
+    padding: 0 20px calc(env(safe-area-inset-bottom,0px) + 28px);
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .modal-backdrop.open .modal-sheet { transform: translateY(0); }
+  .modal-handle {
+    width: 36px; height: 4px; border-radius: 2px;
+    background: var(--border); margin: 12px auto 20px;
+  }
+  .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 4px; letter-spacing: -0.3px; }
+  .modal-subtitle { font-size: 12px; color: var(--muted); margin-bottom: 18px; }
+
+  /* step indicator */
+  .modal-steps {
+    display: flex; gap: 6px; margin-bottom: 20px;
+  }
+  .modal-step-dot {
+    height: 3px; border-radius: 2px; flex: 1;
+    background: var(--border); transition: background 0.25s;
+  }
+  .modal-step-dot.done { background: var(--orange); }
+
+  .modal-field { margin-bottom: 14px; }
+  .modal-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.8px;
+    color: var(--muted); text-transform: uppercase;
+    margin-bottom: 6px; display: block;
+  }
+
+  /* preview inside modal */
+  .modal-preview {
+    display: none; border-radius: var(--r); overflow: hidden;
+    border: 1px solid var(--border); margin-bottom: 14px;
+    background: var(--card);
+  }
+  .modal-preview.show { display: block; }
+  .modal-preview-thumb {
+    width: 100%; aspect-ratio: 16/9;
+    background: var(--surface); overflow: hidden;
+  }
+  .modal-preview-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .modal-preview-info { padding: 10px 12px; }
+  .modal-preview-yt-title {
+    font-size: 12px; color: var(--muted); line-height: 1.4;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+
+  .modal-input {
+    width: 100%; background: var(--card);
+    border: 1.5px solid var(--border); border-radius: var(--r);
+    color: var(--white); font-family: inherit; font-size: 14px;
+    padding: 14px 16px; outline: none; transition: border-color 0.2s;
+    caret-color: var(--orange);
+  }
+  .modal-input::placeholder { color: var(--muted); }
+  .modal-input:focus { border-color: var(--orange); }
+
+  .modal-error {
+    font-size: 12px; color: #ff4444;
+    margin-top: 6px; min-height: 16px; display: block;
+  }
+  .modal-actions { display: flex; gap: 10px; margin-top: 16px; }
+
+  .btn {
+    flex: 1; height: 48px; border-radius: var(--r);
+    border: none; font-family: inherit; font-size: 14px;
+    font-weight: 600; cursor: pointer;
+    transition: transform 0.15s, opacity 0.15s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-ghost { background: var(--card); color: var(--muted); border: 1px solid var(--border); }
+  .btn-primary { background: var(--orange); color: #fff; }
+  .btn-primary:disabled { opacity: 0.35; pointer-events: none; }
+
+  /* ── PLAYER PAGE ── */
+  .player-page {
+    position: fixed; inset: 0; z-index: 300;
+    background: var(--black);
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.32,0.72,0,1);
+    display: flex; flex-direction: column;
+  }
+  .player-page.open { transform: translateY(0); }
+  .player-header {
+    padding: env(safe-area-inset-top,0) 16px 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--black); flex-shrink: 0;
+  }
+  .player-header-inner {
+    display: flex; align-items: center; gap: 12px; height: 52px;
+  }
+  .back-btn {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: var(--card); border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s; flex-shrink: 0;
+  }
+  .back-btn:active { background: var(--border); }
+  .back-btn svg { width: 20px; height: 20px; stroke: var(--white); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .player-title-header {
+    flex: 1; font-size: 13px; font-weight: 600;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .player-content { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
+  .player-video-wrap { width: 100%; aspect-ratio: 16/9; background: #000; }
+  .player-video-wrap iframe { width: 100%; height: 100%; border: none; display: block; }
+  .player-info { padding: 16px; border-bottom: 1px solid var(--border); }
+  .player-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    color: var(--orange); text-transform: uppercase; margin-bottom: 4px;
+  }
+  .player-video-title {
+    font-size: 16px; font-weight: 700; line-height: 1.4;
+    letter-spacing: -0.3px; margin-bottom: 4px;
+  }
+  .player-channel { font-size: 12px; color: var(--muted); font-weight: 500; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">MY<span>.</span>ROUTINE</div>
+    <div class="header-actions">
+      <button class="icon-btn icon-btn-ghost" id="reorderBtn" aria-label="Riordina" title="Riordina">
+        <svg viewBox="0 0 24 24"><line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/></svg>
+      </button>
+      <button class="icon-btn icon-btn-orange" id="openModal" aria-label="Aggiungi video">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- REORDER BANNER -->
+<div class="reorder-banner" id="reorderBanner">Trascina per cambiare l'ordine — tocca ✓ per finire</div>
+
+<!-- LIST -->
+<main class="list" id="videoList"></main>
+
+<!-- EMPTY STATE -->
+<div class="empty" id="emptyState">
+  <div class="empty-icon">
+    <svg viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+  </div>
+  <h2>La tua routine è vuota</h2>
+  <p>Aggiungi i link YouTube dei video che vuoi tenere a portata di mano.</p>
+</div>
+
+<!-- ADD MODAL -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-steps">
+      <div class="modal-step-dot" id="step1dot"></div>
+      <div class="modal-step-dot" id="step2dot"></div>
+    </div>
+    <div class="modal-title" id="modalTitle">Aggiungi video</div>
+    <div class="modal-subtitle" id="modalSubtitle">Passo 1 — Incolla il link YouTube</div>
+
+    <!-- STEP 1: URL -->
+    <div id="stepUrl">
+      <div class="modal-field">
+        <label class="modal-label" for="ytInput">Link YouTube</label>
+        <input class="modal-input" id="ytInput" type="url" inputmode="url"
+               placeholder="https://youtube.com/watch?v=..." autocomplete="off" autocorrect="off" spellcheck="false">
+        <span class="modal-error" id="modalError"></span>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="cancelModal">Annulla</button>
+        <button class="btn btn-primary" id="btnNext">Avanti →</button>
+      </div>
+    </div>
+
+    <!-- STEP 2: NAME -->
+    <div id="stepName" style="display:none">
+      <div class="modal-preview" id="modalPreview">
+        <div class="modal-preview-thumb">
+          <img id="previewThumb" src="" alt="">
+        </div>
+        <div class="modal-preview-info">
+          <div class="modal-preview-yt-title" id="previewYtTitle"></div>
+        </div>
+      </div>
+      <div class="modal-field">
+        <label class="modal-label" for="nameInput">Nome personalizzato</label>
+        <input class="modal-input" id="nameInput" type="text"
+               placeholder="Es. Yoga mattutino" autocomplete="off" autocorrect="on" spellcheck="true" maxlength="60">
+        <span class="modal-error" id="nameError"></span>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="btnBack">← Indietro</button>
+        <button class="btn btn-primary" id="btnConfirm">Salva</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PLAYER PAGE -->
+<div class="player-page" id="playerPage">
+  <header class="player-header">
+    <div class="player-header-inner">
+      <button class="back-btn" id="closePlayer">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div class="player-title-header" id="playerTitleHeader">—</div>
+    </div>
+  </header>
+  <div class="player-content">
+    <div class="player-video-wrap">
+      <iframe id="ytFrame" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+    </div>
+    <div class="player-info">
+      <div class="player-label" id="playerLabel">—</div>
+      <div class="player-video-title" id="playerVideoTitle">—</div>
+      <div class="player-channel" id="playerChannel">—</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── STORAGE ──
+const KEY = 'routine_v2';
+function load() { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } }
+function save() { localStorage.setItem(KEY, JSON.stringify(videos)); }
+
+// ── YT UTILS ──
+function extractId(url) {
+  const m = url.match(/(?:v=|\/v\/|youtu\.be\/|\/embed\/|shorts\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+function thumb(id) { return `https://img.youtube.com/vi/${id}/hqdefault.jpg`; }
+function embed(id) { return `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&modestbranding=1`; }
+
+async function fetchMeta(id) {
+  try {
+    const r = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${id}&format=json`);
+    if (!r.ok) throw 0;
+    const d = await r.json();
+    return { ytTitle: d.title || '', channel: d.author_name || '' };
+  } catch { return { ytTitle: '', channel: '' }; }
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── STATE ──
+let videos = load();
+let reorderMode = false;
+let dragSrc = null;
+
+// ── RENDER ──
+function render() {
+  const list = document.getElementById('videoList');
+  const empty = document.getElementById('emptyState');
+  list.innerHTML = '';
+
+  if (!videos.length) { empty.classList.add('show'); return; }
+  empty.classList.remove('show');
+
+  videos.forEach((v, i) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.dataset.idx = i;
+    card.draggable = reorderMode;
+
+    card.innerHTML = `
+      <div class="drag-handle" aria-label="Trascina">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="9" cy="7" r="1" fill="currentColor"/><circle cx="15" cy="7" r="1" fill="currentColor"/>
+          <circle cx="9" cy="12" r="1" fill="currentColor"/><circle cx="15" cy="12" r="1" fill="currentColor"/>
+          <circle cx="9" cy="17" r="1" fill="currentColor"/><circle cx="15" cy="17" r="1" fill="currentColor"/>
+        </svg>
+      </div>
+      <div class="card-inner">
+        <div class="card-thumb">
+          <img src="${thumb(v.id)}" alt="${esc(v.label)}" loading="lazy"
+               onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 9%22><rect fill=%22%231C1C1C%22 width=%2216%22 height=%229%22/></svg>'">
+          <div class="play-overlay">
+            <div class="play-icon">
+              <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3" fill="#fff"/></svg>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-label">${esc(v.label)}</div>
+          <div class="card-title">${esc(v.ytTitle || v.label)}</div>
+          <div class="card-meta">
+            <span class="card-channel">${esc(v.channel)}</span>
+            <button class="card-remove" aria-label="Rimuovi" onclick="event.stopPropagation(); removeVideo(${i})">
+              <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    if (!reorderMode) {
+      card.addEventListener('click', () => openPlayer(i));
+    }
+
+    // drag events
+    card.addEventListener('dragstart', e => {
+      dragSrc = i;
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    card.addEventListener('dragend', () => card.classList.remove('dragging'));
+    card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('drag-over'); });
+    card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+    card.addEventListener('drop', e => {
+      e.preventDefault();
+      card.classList.remove('drag-over');
+      if (dragSrc === null || dragSrc === i) return;
+      const moved = videos.splice(dragSrc, 1)[0];
+      videos.splice(i, 0, moved);
+      save(); render();
+    });
+
+    // touch drag (mobile)
+    let touchY0, touchIdx;
+    card.querySelector('.drag-handle').addEventListener('touchstart', e => {
+      if (!reorderMode) return;
+      touchY0 = e.touches[0].clientY;
+      touchIdx = i;
+      card.classList.add('dragging');
+      e.preventDefault();
+    }, { passive: false });
+
+    document.addEventListener('touchmove', e => {
+      if (!card.classList.contains('dragging')) return;
+      const y = e.touches[0].clientY;
+      const els = [...document.querySelectorAll('.card')];
+      for (const el of els) {
+        const r = el.getBoundingClientRect();
+        if (y >= r.top && y <= r.bottom && el !== card) {
+          els.forEach(c => c.classList.remove('drag-over'));
+          el.classList.add('drag-over');
+          break;
+        }
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchend', e => {
+      if (!card.classList.contains('dragging')) return;
+      card.classList.remove('dragging');
+      const over = document.querySelector('.card.drag-over');
+      if (over) {
+        over.classList.remove('drag-over');
+        const toIdx = parseInt(over.dataset.idx);
+        if (toIdx !== touchIdx) {
+          const moved = videos.splice(touchIdx, 1)[0];
+          videos.splice(toIdx, 0, moved);
+          save(); render();
+        }
+      }
+    });
+
+    list.appendChild(card);
+  });
+
+  if (reorderMode) list.classList.add('reorder-active');
+  else list.classList.remove('reorder-active');
+}
+
+function removeVideo(i) {
+  videos.splice(i, 1);
+  save(); render();
+}
+
+// ── REORDER MODE ──
+const reorderBtn = document.getElementById('reorderBtn');
+const reorderBanner = document.getElementById('reorderBanner');
+
+reorderBtn.addEventListener('click', () => {
+  reorderMode = !reorderMode;
+  reorderBtn.classList.toggle('active', reorderMode);
+  reorderBanner.style.display = reorderMode ? 'block' : 'none';
+  // change icon: hamburger → checkmark
+  reorderBtn.querySelector('svg').innerHTML = reorderMode
+    ? '<polyline points="20 6 9 17 4 12"/>'
+    : '<line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/>';
+  render();
+});
+
+// ── PLAYER ──
+function openPlayer(i) {
+  if (reorderMode) return;
+  const v = videos[i];
+  document.getElementById('ytFrame').src = embed(v.id);
+  document.getElementById('playerTitleHeader').textContent = v.label;
+  document.getElementById('playerLabel').textContent = v.label;
+  document.getElementById('playerVideoTitle').textContent = v.ytTitle || v.label;
+  document.getElementById('playerChannel').textContent = v.channel;
+  document.getElementById('playerPage').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closePlayer() {
+  document.getElementById('playerPage').classList.remove('open');
+  setTimeout(() => { document.getElementById('ytFrame').src = ''; }, 350);
+  document.body.style.overflow = '';
+}
+document.getElementById('closePlayer').addEventListener('click', closePlayer);
+
+// ── MODAL (2 step) ──
+const backdrop = document.getElementById('modalBackdrop');
+let pendingId = null, pendingMeta = null;
+
+function goStep(n) {
+  document.getElementById('stepUrl').style.display = n === 1 ? 'block' : 'none';
+  document.getElementById('stepName').style.display = n === 2 ? 'block' : 'none';
+  document.getElementById('step1dot').classList.toggle('done', n >= 1);
+  document.getElementById('step2dot').classList.toggle('done', n >= 2);
+  if (n === 1) {
+    document.getElementById('modalTitle').textContent = 'Aggiungi video';
+    document.getElementById('modalSubtitle').textContent = 'Passo 1 — Incolla il link YouTube';
+  } else {
+    document.getElementById('modalTitle').textContent = 'Dai un nome';
+    document.getElementById('modalSubtitle').textContent = 'Passo 2 — Come vuoi chiamarlo?';
+  }
+}
+
+function openModal() {
+  backdrop.classList.add('open');
+  document.getElementById('ytInput').value = '';
+  document.getElementById('modalError').textContent = '';
+  document.getElementById('nameInput').value = '';
+  document.getElementById('nameError').textContent = '';
+  document.getElementById('modalPreview').classList.remove('show');
+  pendingId = null; pendingMeta = null;
+  goStep(1);
+  setTimeout(() => document.getElementById('ytInput').focus(), 300);
+}
+function closeModal() {
+  backdrop.classList.remove('open');
+}
+
+document.getElementById('openModal').addEventListener('click', openModal);
+document.getElementById('cancelModal').addEventListener('click', closeModal);
+backdrop.addEventListener('click', e => { if (e.target === backdrop) closeModal(); });
+
+// Step 1 → 2
+document.getElementById('btnNext').addEventListener('click', async () => {
+  const url = document.getElementById('ytInput').value.trim();
+  const err = document.getElementById('modalError');
+  if (!url) { err.textContent = 'Incolla un link YouTube.'; return; }
+  const id = extractId(url);
+  if (!id) { err.textContent = 'Link non valido. Usa un URL YouTube.'; return; }
+  if (videos.find(v => v.id === id)) { err.textContent = 'Video già presente.'; return; }
+  err.textContent = '';
+
+  const btn = document.getElementById('btnNext');
+  btn.disabled = true; btn.textContent = 'Carico…';
+  const meta = await fetchMeta(id);
+  btn.disabled = false; btn.textContent = 'Avanti →';
+
+  pendingId = id; pendingMeta = meta;
+
+  // show preview
+  document.getElementById('previewThumb').src = thumb(id);
+  document.getElementById('previewYtTitle').textContent = meta.ytTitle || 'Video YouTube';
+  document.getElementById('modalPreview').classList.add('show');
+
+  // pre-fill name with yt title
+  document.getElementById('nameInput').value = meta.ytTitle ? meta.ytTitle.slice(0, 60) : '';
+  goStep(2);
+  setTimeout(() => {
+    const ni = document.getElementById('nameInput');
+    ni.focus(); ni.select();
+  }, 300);
+});
+
+// Step 2 → back
+document.getElementById('btnBack').addEventListener('click', () => goStep(1));
+
+// Confirm
+document.getElementById('btnConfirm').addEventListener('click', () => {
+  const label = document.getElementById('nameInput').value.trim();
+  const err = document.getElementById('nameError');
+  if (!label) { err.textContent = 'Scrivi un nome per il video.'; return; }
+  err.textContent = '';
+  videos.unshift({
+    id: pendingId,
+    label,
+    ytTitle: pendingMeta.ytTitle,
+    channel: pendingMeta.channel,
+    addedAt: Date.now()
+  });
+  save(); render(); closeModal();
+});
+
+document.getElementById('ytInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btnNext').click();
+});
+document.getElementById('nameInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btnConfirm').click();
+});
+
+// ── INIT ──
+render();
+</script>
+</body>
+</html>
